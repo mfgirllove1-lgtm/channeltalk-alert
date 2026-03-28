@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: channeltalk-alert
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SLACK_WEBHOOK_URL
+        sync: false          # Render 대시보드에서 직접 입력
+      - key: CHANNELTALK_WEBHOOK_SECRET
+        sync: false
