@@ -8,7 +8,9 @@ import os
 from datetime import datetime
 from app.detector import EscalationResult
 
-SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
+SLACK_BOT_TOKEN   = os.getenv("SLACK_BOT_TOKEN", "")
+SLACK_CHANNEL_ID  = os.getenv("SLACK_CHANNEL_ID", "")
+SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")  # 레거시 fallback
 
 LEVEL_COLOR = {
     "CRITICAL": "#E74C3C",  # 빨강
@@ -26,10 +28,15 @@ LEVEL_EMOJI = {
 def send_alert(result: EscalationResult, channeltalk_url: str = "") -> bool:
     """
     에스컬레이션 결과를 Slack Block Kit 메시지로 전송합니다.
+    Bot Token(SLACK_BOT_TOKEN + SLACK_CHANNEL_ID) 우선,
+    없으면 Incoming Webhook(SLACK_WEBHOOK_URL) 사용.
     Returns True if successful.
     """
-    if not SLACK_WEBHOOK_URL:
-        print("[SlackNotifier] SLACK_WEBHOOK_URL 환경변수가 설정되지 않았습니다.")
+    use_bot = bool(SLACK_BOT_TOKEN and SLACK_CHANNEL_ID)
+    use_webhook = bool(SLACK_WEBHOOK_URL)
+
+    if not use_bot and not use_webhook:
+        print("[SlackNotifier] Slack 환경변수가 설정되지 않았습니다.")
         return False
 
     emoji = LEVEL_EMOJI.get(result.level, "⚠️")
@@ -104,8 +111,21 @@ def send_alert(result: EscalationResult, channeltalk_url: str = "") -> bool:
     }
 
     try:
-        resp = requests.post(SLACK_WEBHOOK_URL, json=payload, timeout=5)
-        resp.raise_for_status()
+        if use_bot:
+            resp = requests.post(
+                "https://slack.com/api/chat.postMessage",
+                headers={"Authorization": f"Bearer {SLACK_BOT_TOKEN}"},
+                json={"channel": SLACK_CHANNEL_ID, **payload},
+                timeout=5,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if not data.get("ok"):
+                print(f"[SlackNotifier] Slack API 오류: {data.get('error')}")
+                return False
+        else:
+            resp = requests.post(SLACK_WEBHOOK_URL, json=payload, timeout=5)
+            resp.raise_for_status()
         return True
     except requests.RequestException as e:
         print(f"[SlackNotifier] 전송 실패: {e}")
