@@ -61,3 +61,24 @@ def test_preview_truncation():
     long_text = "테스트 " * 100
     result = detect(long_text)
     assert len(result.message_preview) <= 130
+
+
+def test_sobowon_keyword():
+    result = detect("소보원에 신고하겠습니다")
+    assert result.should_escalate is True
+    assert result.level == "CRITICAL"
+    assert "소보원" in result.matched_keywords
+
+
+def test_media_eonron_keyword():
+    result = detect("언론에 제보할 거예요")
+    assert result.should_escalate is True
+    assert result.level == "CRITICAL"
+    assert "언론" in result.matched_keywords
+
+
+def test_ecommerce_law_keyword():
+    result = detect("전자상거래법 위반 아닌가요?")
+    assert result.should_escalate is True
+    assert result.level == "CRITICAL"
+    assert "전자상거래법" in result.matched_keywords
